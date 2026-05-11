@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEURAL-LINK // Personal Resource Dashboard</title>
+    <!-- Frameworks -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
+
+        :root {
+            --neon-blue: #00f5ff;
+            --neon-purple: #8b5cf6;
+            --dark-bg: #050816;
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: white;
+            font-family: 'Rajdhani', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+
+        /* Cyberpunk Background */
+        .grid-bg {
+            background-image: 
+                linear-gradient(to right, rgba(0, 245, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0, 245, 255, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            mask-image: radial-gradient(circle at center, black, transparent 90%);
+        }
+
+        .glass {
+            background: rgba(10, 15, 30, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 245, 255, 0.1);
+        }
+
+        .neon-glow-blue { box-shadow: 0 0 15px rgba(0, 245, 255, 0.2); }
+        .neon-text-blue { text-shadow: 0 0 8px var(--neon-blue); }
+
+        /* Responsive Sidebar for Mobile */
+        @media (max-width: 1024px) {
+            .sidebar-hide { transform: translateX(-100%); }
+            .sidebar-open { transform: translateX(0); }
+        }
+
+        /* Scanline effect */
+        .scanline {
+            width: 100%;
+            height: 2px;
+            background: rgba(0, 245, 255, 0.05);
+            position: fixed;
+            top: 0;
+            z-index: 100;
+            pointer-events: none;
+            animation: scan 6s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(100vh); }
+        }
+
+        .animate-pulse-slow {
+            animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="antialiased select-none">
+
+    <div class="grid-bg"></div>
+    <div class="scanline"></div>
+
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- SIDEBAR (Desktop: Fixed, Mobile: Overlay) -->
+        <aside id="sidebar" class="fixed lg:relative z-50 w-64 h-full glass border-r border-cyan-500/20 p-6 sidebar-hide lg:sidebar-open transition-transform duration-300">
+            <div class="flex items-center gap-3 mb-10">
+                <div class="w-10 h-10 bg-cyan-500 rounded flex items-center justify-center shadow-[0_0_15px_#00f5ff]">
+                    <i class="fas fa-bolt text-black"></i>
+                </div>
+                <span class="font-orbitron font-bold text-cyan-400 tracking-tighter text-lg">NEURAL-LINK</span>
+            </div>
+
+            <nav class="space-y-6">
+                <a href="#" class="flex items-center gap-4 text-cyan-400 group">
+                    <i class="fas fa-rocket w-5"></i>
+                    <span class="font-bold uppercase tracking-widest text-sm">Main Core</span>
+                </a>
+                <a href="https://romanzv.github.io/money-tracker/" class="flex items-center gap-4 text-slate-400 hover:text-cyan-300 transition-colors">
+                    <i class="fas fa-wallet w-5"></i>
+                    <span class="uppercase tracking-widest text-sm">Finance</span>
+                </a>
+                <a href="#" class="flex items-center gap-4 text-slate-400 hover:text-cyan-300 transition-colors">
+                    <i class="fas fa-globe w-5"></i>
+                    <span class="uppercase tracking-widest text-sm">Network</span>
+                </a>
+                <a href="#" class="flex items-center gap-4 text-slate-400 hover:text-cyan-300 transition-colors">
+                    <i class="fas fa-music w-5"></i>
+                    <span class="uppercase tracking-widest text-sm">Audio Lab</span>
+                </a>
+            </nav>
+
+            <button onclick="toggleSidebar()" class="lg:hidden absolute -right-12 top-6 w-10 h-10 glass rounded-full flex items-center justify-center text-cyan-400">
+                <i class="fas fa-times"></i>
+            </button>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 overflow-y-auto pb-24">
+            
+            <!-- NAVBAR -->
+            <nav class="sticky top-0 z-40 glass border-b border-white/5 px-4 lg:px-8 py-4 flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleSidebar()" class="lg:hidden text-cyan-400 text-xl">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="hidden md:block relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                        <input type="text" placeholder="AI Search..." class="bg-white/5 border border-white/10 rounded-lg py-1.5 pl-10 pr-4 w-48 focus:w-64 focus:outline-none focus:border-cyan-500/50 transition-all text-xs">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <p id="clock" class="font-orbitron text-cyan-400 text-sm lg:text-lg">00:00:00</p>
+                        <p class="text-[8px] text-slate-500 uppercase text-right">Node: 2026.SYS</p>
+                    </div>
+                    <div id="mqtt-status" class="glass px-3 py-1 rounded-full border-red-500/30 flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                        <span class="text-[10px] text-red-400 font-bold uppercase">Offline</span>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="p-4 lg:p-8 max-w-7xl mx-auto space-y-6">
+                
+                <!-- TOP CARDS -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="glass p-5 rounded-2xl border-l-2 border-cyan-500 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-30 transition-opacity">
+                            <i class="fas fa-thermometer-half text-4xl"></i>
+                        </div>
+                        <h4 class="text-slate-500 text-[10px] uppercase font-bold mb-1">Temperature</h4>
+                        <p id="val-temp" class="text-2xl lg:text-3xl font-orbitron neon-text-blue">--.-°C</p>
+                    </div>
+                    
+                    <div class="glass p-5 rounded-2xl border-l-2 border-purple-500">
+                        <h4 class="text-slate-500 text-[10px] uppercase font-bold mb-1">Humidity</h4>
+                        <p id="val-humi" class="text-2xl lg:text-3xl font-orbitron text-purple-400">--%</p>
+                    </div>
+
+                    <div class="glass p-5 rounded-2xl border-l-2 border-emerald-500 col-span-2 lg:col-span-1">
+                        <h4 class="text-slate-500 text-[10px] uppercase font-bold mb-1">Power Usage</h4>
+                        <p class="text-2xl lg:text-3xl font-orbitron text-emerald-400">240<span class="text-sm">Wh</span></p>
+                    </div>
+
+                    <div class="hidden lg:flex glass p-5 rounded-2xl items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-cyan-500/10 flex items-center justify-center text-cyan-400 animate-pulse">
+                            <i class="fas fa-cloud"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold">28°C Jakarta</p>
+                            <p class="text-[10px] text-slate-500">Cloudy Overcast</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MAIN INTERFACE -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- GRAPH -->
+                    <div class="lg:col-span-2 glass rounded-3xl p-6 relative">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="font-orbitron text-xs tracking-widest text-cyan-400">LIVE_TELEMETRY.data</h3>
+                            <div class="flex gap-2">
+                                <div class="w-2 h-2 rounded-full bg-cyan-500 animate-ping"></div>
+                            </div>
+                        </div>
+                        <!-- Simple Visual Graph -->
+                        <div class="h-48 w-full flex items-end gap-1 px-2 border-b border-white/10">
+                            <div class="flex-1 bg-cyan-500/20 border-t border-cyan-500/50 h-[40%]"></div>
+                            <div class="flex-1 bg-cyan-500/20 border-t border-cyan-500/50 h-[60%]"></div>
+                            <div class="flex-1 bg-cyan-500/20 border-t border-cyan-500/50 h-[35%]"></div>
+                            <div class="flex-1 bg-cyan-500/20 border-t border-cyan-500/50 h-[80%] shadow-[0_0_15px_rgba(0,245,255,0.3)]"></div>
+                            <div class="flex-1 bg-cyan-500/20 border-t border-cyan-500/50 h-[50%]"></div>
+                            <div class="flex-1 bg-cyan-500/20 border-t border-cyan-500/50 h-[65%]"></div>
+                        </div>
+                    </div>
+
+                    <!-- IOT CONTROLS -->
+                    <div class="space-y-4">
+                        <h3 class="font-orbitron text-[10px] tracking-widest text-slate-500 uppercase">Hardware Node</h3>
+                        
+                        <!-- Toggle Device -->
+                        <div class="glass p-4 rounded-xl flex items-center justify-between neon-border-blue transition-all">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-lightbulb text-cyan-400"></i>
+                                <span class="text-sm font-bold">Main Lamp</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="btn-lamp" class="sr-only peer">
+                                <div class="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                            </label>
+                        </div>
+
+                        <div class="glass p-4 rounded-xl flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-wind text-purple-400"></i>
+                                <span class="text-sm font-bold">Cooling Fan</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="btn-fan" class="sr-only peer">
+                                <div class="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
+                            </label>
+                        </div>
+
+                        <!-- Music Player -->
+                        <div class="glass p-5 rounded-2xl border border-white/5 bg-gradient-to-br from-cyan-500/5 to-transparent">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded bg-slate-800 overflow-hidden">
+                                    <img src="https://api.dicebear.com/7.x/identicon/svg?seed=music" alt="cover">
+                                </div>
+                                <div class="overflow-hidden">
+                                    <p class="text-xs font-bold truncate">Resonance - Home</p>
+                                    <p class="text-[9px] text-cyan-500 uppercase tracking-tighter">Synthetix Radio</p>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center text-xs px-2">
+                                <i class="fas fa-random text-slate-600"></i>
+                                <i class="fas fa-step-backward"></i>
+                                <i class="fas fa-play text-cyan-400 text-lg"></i>
+                                <i class="fas fa-step-forward"></i>
+                                <i class="fas fa-redo text-slate-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LINKS GRID -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <a href="#" class="glass p-6 rounded-2xl flex items-center justify-between group hover:bg-cyan-500/5 transition-all">
+                        <span class="font-orbitron text-xs tracking-widest uppercase">Money Tracker</span>
+                        <i class="fas fa-arrow-right text-cyan-500 group-hover:translate-x-2 transition-transform"></i>
+                    </a>
+                    <a href="#" class="glass p-6 rounded-2xl flex items-center justify-between group hover:bg-purple-500/5 transition-all">
+                        <span class="font-orbitron text-xs tracking-widest uppercase">Portfolio</span>
+                        <i class="fas fa-arrow-right text-purple-500 group-hover:translate-x-2 transition-transform"></i>
+                    </a>
+                    <a href="#" class="glass p-6 rounded-2xl flex items-center justify-between group hover:bg-emerald-500/5 transition-all">
+                        <span class="font-orbitron text-xs tracking-widest uppercase">Private Cloud</span>
+                        <i class="fas fa-arrow-right text-emerald-500 group-hover:translate-x-2 transition-transform"></i>
+                    </a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- NOTIFICATION TOAST -->
+    <div id="toast" class="fixed bottom-6 right-6 left-6 lg:left-auto lg:w-80 glass p-4 rounded-xl border-l-4 border-cyan-500 translate-y-32 transition-transform duration-500 flex items-center gap-4 z-[100]">
+        <div class="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <i class="fas fa-info-circle"></i>
+        </div>
+        <div>
+            <p class="text-[10px] text-cyan-400 font-bold uppercase tracking-widest leading-none mb-1">System Update</p>
+            <p id="toast-msg" class="text-xs text-slate-300">Welcome to Neural-Link v1.0</p>
+        </div>
+    </div>
+
+    <script>
+        // --- UI LOGIC ---
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('sidebar-hide');
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString('en-GB');
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = msg;
+            toast.style.transform = 'translateY(0)';
+            setTimeout(() => { toast.style.transform = 'translateY(150%)'; }, 3000);
+        }
+
+        // --- MQTT LOGIC ---
+        // GANTI INI dengan IP atau Domain Broker MQTT Anda
+        const MQTT_CONFIG = {
+            host: 'wss://broker.emqx.io:8084/mqtt', // Contoh menggunakan Public Broker Secure WebSocket
+            topic_temp: 'neural/sensor/temp',
+            topic_humi: 'neural/sensor/humi',
+            topic_lamp: 'neural/device/lamp',
+            topic_fan: 'neural/device/fan'
+        };
+
+        const client = mqtt.connect(MQTT_CONFIG.host);
+
+        client.on('connect', () => {
+            console.log('Connected to MQTT');
+            const statusNode = document.getElementById('mqtt-status');
+            statusNode.classList.replace('border-red-500/30', 'border-emerald-500/30');
+            statusNode.querySelector('span:first-child').classList.replace('bg-red-500', 'bg-emerald-500');
+            statusNode.querySelector('span:last-child').textContent = 'Online';
+            statusNode.querySelector('span:last-child').classList.replace('text-red-400', 'text-emerald-400');
+            
+            client.subscribe([MQTT_CONFIG.topic_temp, MQTT_CONFIG.topic_humi, MQTT_CONFIG.topic_lamp, MQTT_CONFIG.topic_fan]);
+            showToast("System Connected to Broker");
+        });
+
+        client.on('message', (topic, message) => {
+            const msg = message.toString();
+            if (topic === MQTT_CONFIG.topic_temp) {
+                document.getElementById('val-temp').innerHTML = `${msg}<span class="text-sm">°C</span>`;
+            }
+            if (topic === MQTT_CONFIG.topic_humi) {
+                document.getElementById('val-humi').innerHTML = `${msg}<span class="text-sm">%</span>`;
+            }
+            if (topic === MQTT_CONFIG.topic_lamp) {
+                document.getElementById('btn-lamp').checked = (msg === 'ON');
+            }
+            if (topic === MQTT_CONFIG.topic_fan) {
+                document.getElementById('btn-fan').checked = (msg === 'ON');
+            }
+        });
+
+        // Publish actions
+        document.getElementById('btn-lamp').addEventListener('change', (e) => {
+            const state = e.target.checked ? 'ON' : 'OFF';
+            client.publish(MQTT_CONFIG.topic_lamp, state, { retain: true });
+            showToast(`Lampu: ${state}`);
+        });
+
+        document.getElementById('btn-fan').addEventListener('change', (e) => {
+            const state = e.target.checked ? 'ON' : 'OFF';
+            client.publish(MQTT_CONFIG.topic_fan, state, { retain: true });
+            showToast(`Fan: ${state}`);
+        });
+
+        client.on('error', (err) => {
+            console.error('Connection error: ', err);
+            showToast("Connection Lost!");
+        });
+    </script>
+</body>
+</html>
