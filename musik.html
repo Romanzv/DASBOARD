@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEURAL-AUDIO // Elite Master v5.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap');
+        
+        :root {
+            --neon-blue: #00f5ff;
+            --neon-purple: #8b5cf6;
+            --dark-bg: #050816;
+        }
+
+        body { 
+            background: var(--dark-bg); 
+            color: #e2e8f0; 
+            font-family: 'Rajdhani', sans-serif; 
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+
+        /* Background & Aesthetics */
+        .grid-bg {
+            background-image: linear-gradient(to right, rgba(0, 245, 255, 0.03) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(0, 245, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            position: fixed; inset: 0; z-index: -1;
+        }
+
+        .glass { 
+            background: rgba(10, 15, 30, 0.7); 
+            backdrop-filter: blur(20px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .neon-glow { text-shadow: 0 0 15px var(--neon-blue); }
+
+        /* Custom EQ Sliders */
+        input[type=range].eq-slider {
+            writing-mode: bt-lr; appearance: slider-vertical;
+            width: 10px; height: 100px;
+            background: rgba(255,255,255,0.05);
+            accent-color: var(--neon-blue);
+        }
+
+        /* Full Spectrum Visualizer Background */
+        #visualizer {
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .song-item { transition: all 0.2s ease; }
+        .song-item.active {
+            background: rgba(0, 245, 255, 0.1);
+            border-left: 3px solid var(--neon-blue);
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        @media (max-width: 768px) {
+            .mobile-hide { display: none; }
+            .mobile-full { width: 100% !important; }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="grid-bg"></div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div class="relative z-10 flex flex-col h-screen overflow-hidden">
+        
+        <!-- TOP NAV -->
+        <header class="glass border-b border-white/10 p-4 flex justify-between items-center no-print">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-cyan-500 rounded flex items-center justify-center shadow-[0_0_15px_cyan]">
+                    <i class="fas fa-microchip text-black text-sm"></i>
+                </div>
+                <div>
+                    <h1 class="font-orbitron font-black text-cyan-400 leading-none text-lg tracking-tighter">NEURAL_AUDIO</h1>
+                    <p class="text-[8px] uppercase tracking-[0.4em] text-slate-500">v5.0 Master Edition</p>
+                </div>
+            </div>
+            <div class="flex gap-4 items-center">
+                <div id="status-node" class="flex items-center gap-2 glass px-3 py-1 rounded-full border border-white/10">
+                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                    <span class="text-[9px] font-orbitron uppercase text-slate-400">Node Online</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT AREA -->
+        <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+            
+            <!-- LEFT: PLAYLIST & TABS -->
+            <aside class="w-full md:w-80 glass md:border-r border-white/5 flex flex-col z-20">
+                <div class="p-5 space-y-4">
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-3 top-2.5 text-cyan-500/40 text-xs"></i>
+                        <input type="text" id="searchInput" oninput="searchMusic()" placeholder="SEARCH AUDIO..." 
+                               class="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-9 pr-4 text-[10px] focus:outline-none focus:border-cyan-500 text-cyan-100 transition-all">
+                    </div>
+                    <div class="flex gap-4 text-[10px] font-orbitron font-bold uppercase tracking-widest border-b border-white/5 pb-2">
+                        <button onclick="switchTab('all')" id="tab-all" class="text-cyan-400 border-b-2 border-cyan-400 pb-2">Database</button>
+                        <button onclick="switchTab('fav')" id="tab-fav" class="text-slate-500 hover:text-cyan-300 pb-2">Favorites</button>
+                    </div>
+                </div>
+                <div id="playlistContainer" class="flex-1 overflow-y-auto px-3 pb-24 space-y-1 no-scrollbar">
+                    <!-- Music list via JS -->
+                </div>
+            </aside>
+
+            <!-- CENTER: DISPLAY & FULL VISUALIZER -->
+            <section class="flex-1 relative flex flex-col items-center justify-center p-6 text-center">
+                <!-- Spectrum BG -->
+                <canvas id="visualizer"></canvas>
+
+                <div class="relative z-10 w-full max-w-2xl">
+                    <!-- Artwork -->
+                    <div class="relative inline-block mb-6">
+                        <div id="glowCircle" class="absolute -inset-10 bg-cyan-500 rounded-full blur-[80px] opacity-10 transition-all duration-1000"></div>
+                        <img id="diskCover" src="https://raw.githubusercontent.com/a7x-Fanbase-blitar/a7x-countdown-live-JIS/main/a7xblitar.png" 
+                             class="relative w-40 h-40 md:w-64 md:h-64 rounded-2xl object-cover border border-white/10 shadow-2xl animate-pulse">
+                    </div>
+
+                    <div class="space-y-2 mb-8">
+                        <h2 id="songTitle" class="text-3xl md:text-6xl font-orbitron font-black text-white tracking-tighter uppercase neon-glow truncate px-4">Initializing...</h2>
+                        <p id="songArtist" class="text-purple-400 font-bold tracking-[0.5em] text-[10px] uppercase">Neural Signal Processor</p>
+                    </div>
+
+                    <!-- MOBILE DSP TRIGGER (Icon Only on Mobile) -->
+                    <button onclick="toggleDSP()" class="md:hidden glass p-3 rounded-full border-cyan-500/30 text-cyan-400 mb-4">
+                        <i class="fas fa-sliders-h"></i> Adjust DSP
+                    </button>
+                </div>
+            </section>
+
+            <!-- RIGHT: DSP CONTROLS (Hidden on small mobile, toggleable) -->
+            <aside id="dspPanel" class="w-full md:w-72 glass md:border-l border-white/5 p-6 flex flex-col z-20 mobile-hide md:block">
+                <h3 class="font-orbitron text-[10px] text-cyan-400 mb-6 uppercase tracking-widest flex items-center gap-2">
+                    <i class="fas fa-wave-square"></i> Audio Signal Processor
+                </h3>
+                
+                <!-- EQ BANDS -->
+                <div class="flex justify-between items-end h-40 bg-black/40 p-4 rounded-2xl border border-white/5 mb-6">
+                    <div class="flex flex-col items-center gap-2">
+                        <input type="range" class="eq-slider" id="eq-60" min="-12" max="12" value="0">
+                        <span class="text-[7px] font-bold text-slate-500">60Hz</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2">
+                        <input type="range" class="eq-slider" id="eq-310" min="-12" max="12" value="0">
+                        <span class="text-[7px] font-bold text-slate-500">310Hz</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2">
+                        <input type="range" class="eq-slider" id="eq-1k" min="-12" max="12" value="0">
+                        <span class="text-[7px] font-bold text-slate-500">1kHz</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2">
+                        <input type="range" class="eq-slider" id="eq-6k" min="-12" max="12" value="0">
+                        <span class="text-[7px] font-bold text-slate-500">6kHz</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2">
+                        <input type="range" class="eq-slider" id="eq-16k" min="-12" max="12" value="0">
+                        <span class="text-[7px] font-bold text-slate-500">16Hz</span>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                        <div class="flex justify-between text-[9px] font-orbitron uppercase text-slate-400 mb-2">
+                            <span>Bass Boost</span>
+                            <span id="bassVal" class="text-cyan-400 font-bold">0%</span>
+                        </div>
+                        <input type="range" id="bassSlider" min="0" max="100" value="0" class="w-full h-1 appearance-none rounded-full accent-cyan-500 bg-zinc-800">
+                    </div>
+                    <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                        <div class="flex justify-between text-[9px] font-orbitron uppercase text-slate-400 mb-2">
+                            <span>Output Vol</span>
+                            <span id="volVal" class="text-cyan-400 font-bold">80%</span>
+                        </div>
+                        <input type="range" id="volumeSlider" min="0" max="100" value="80" class="w-full h-1 appearance-none rounded-full accent-cyan-500 bg-zinc-800">
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- PLAYER FOOTER -->
+        <footer class="glass border-t border-white/10 p-4 md:p-6 z-30">
+            <div class="max-w-7xl mx-auto flex items-center gap-4 md:gap-10">
+                
+                <div class="w-1/4 hidden lg:flex items-center">
+                    <img id="miniCover" src="https://raw.githubusercontent.com/a7x-Fanbase-blitar/a7x-countdown-live-JIS/main/a7xblitar.png" class="w-10 h-10 rounded border border-white/10 mr-3">
+                    <div class="truncate">
+                        <p id="miniTitle" class="text-xs font-bold text-white truncate font-orbitron">IDLE_PROCESS</p>
+                        <p class="text-[8px] text-cyan-500 font-bold tracking-widest uppercase">Streaming Node</p>
+                    </div>
+                </div>
+
+                <div class="flex-1 flex flex-col items-center">
+                    <div class="flex items-center gap-6 md:gap-10 mb-2">
+                        <button onclick="prev()" class="text-slate-500 hover:text-cyan-400 transition"><i class="fas fa-backward-step"></i></button>
+                        <button onclick="togglePlay()" class="w-12 h-12 rounded-full bg-cyan-500 flex items-center justify-center text-black shadow-[0_0_20px_cyan] hover:scale-110 active:scale-95 transition">
+                            <i id="playIcon" class="fas fa-play ml-1"></i>
+                        </button>
+                        <button onclick="next()" class="text-slate-500 hover:text-cyan-400 transition"><i class="fas fa-forward-step"></i></button>
+                    </div>
+                    <div class="w-full flex items-center gap-3 text-[9px] font-orbitron text-slate-500">
+                        <span id="currentTime">00:00</span>
+                        <input type="range" id="progressBar" value="0" class="flex-1 h-1 bg-white/10 appearance-none rounded-full accent-cyan-400 cursor-pointer">
+                        <span id="durationTime">00:00</span>
+                    </div>
+                </div>
+
+                <div class="w-1/4 flex justify-end">
+                    <button onclick="toggleFavoriteCurrent()" id="favBtnMain" class="text-xl text-slate-600 hover:text-red-500 transition">
+                        <i class="far fa-heart"></i>
+                    </button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <audio id="audioPlayer" crossOrigin="anonymous"></audio>
+
+    <script>
+        const GITHUB_USER = "a7x-Fanbase-blitar";
+        const GITHUB_REPO = "aset-music";
+        
+        let allSongs = [], favorites = JSON.parse(localStorage.getItem('neural_favs')) || [], currentIndex = 0, currentTab = 'all';
+        const audio = document.getElementById('audioPlayer');
+        const playIcon = document.getElementById('playIcon');
+        const disk = document.getElementById('diskCover');
+        const visualizer = document.getElementById('visualizer');
+        const vCtx = visualizer.getContext('2d');
+        
+        let audioCtx, analyser, source, dataArray, filters = [];
+
+        async function fetchMusic() {
+            try {
+                const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`);
+                const files = await res.json();
+                allSongs = files.filter(f => f.name.endsWith('.mp3')).map(f => ({
+                    id: f.sha, title: f.name.replace('.mp3', '').replace(/_/g, ' '),
+                    url: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/${f.name}`
+                }));
+                renderPlaylist();
+                if(allSongs.length > 0) loadSong(0, false);
+            } catch (e) { console.error("Neural Node Connection Error"); }
+        }
+
+        function initAudioCore() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioCtx.createAnalyser();
+            source = audioCtx.createMediaElementSource(audio);
+            
+            const freqs = [60, 310, 1000, 6000, 16000];
+            let lastNode = source;
+            filters = freqs.map(f => {
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = (f < 100) ? "lowshelf" : (f > 10000) ? "highshelf" : "peaking";
+                filter.frequency.value = f;
+                lastNode.connect(filter);
+                lastNode = filter;
+                return filter;
+            });
+            const bassNode = audioCtx.createBiquadFilter();
+            bassNode.type = "lowshelf";
+            bassNode.frequency.value = 200;
+            lastNode.connect(bassNode);
+            filters.push(bassNode); 
+            bassNode.connect(analyser);
+            analyser.connect(audioCtx.destination);
+            analyser.fftSize = 512;
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+            drawVisualizer();
+        }
+
+        function drawVisualizer() {
+            requestAnimationFrame(drawVisualizer);
+            analyser.getByteFrequencyData(dataArray);
+            vCtx.clearRect(0, 0, visualizer.width, visualizer.height);
+            
+            const barWidth = (visualizer.width / dataArray.length) * 1.5;
+            let x = 0;
+            for(let i = 0; i < dataArray.length; i++) {
+                const barHeight = (dataArray[i] / 255) * visualizer.height * 0.8;
+                const hue = (i / dataArray.length) * 360;
+                vCtx.fillStyle = `hsla(${hue}, 100%, 50%, 0.15)`;
+                vCtx.fillRect(x, visualizer.height - barHeight, barWidth, barHeight);
+                x += barWidth + 1;
+            }
+        }
+
+        function renderPlaylist() {
+            const container = document.getElementById('playlistContainer');
+            const list = currentTab === 'all' ? allSongs : allSongs.filter(s => favorites.includes(s.id));
+            container.innerHTML = list.map((s, i) => `
+                <div onclick="loadNode('${s.url}')" class="song-item group flex items-center p-3 rounded-xl cursor-pointer ${audio.src === s.url ? 'active' : 'hover:bg-white/5'}">
+                    <div class="w-7 h-7 rounded bg-black/40 flex items-center justify-center mr-3 border border-white/5">
+                        <i class="fas ${audio.src === s.url ? 'fa-volume-up text-cyan-400' : 'fa-music text-slate-600'} text-[9px]"></i>
+                    </div>
+                    <div class="flex-1 truncate">
+                        <p class="text-[11px] font-bold ${audio.src === s.url ? 'text-cyan-400' : 'text-slate-300'} truncate uppercase tracking-tighter">${s.title}</p>
+                    </div>
+                    ${favorites.includes(s.id) ? '<i class="fas fa-heart text-red-500 text-[8px]"></i>' : ''}
+                </div>`).join('');
+        }
+
+        function loadSong(i, auto) {
+            currentIndex = i; const s = allSongs[i];
+            audio.src = s.url;
+            document.getElementById('songTitle').innerText = s.title;
+            document.getElementById('miniTitle').innerText = s.title;
+            updateFavBtn(); renderPlaylist();
+            if(auto) togglePlay(true);
+        }
+
+        function loadNode(url) {
+            const idx = allSongs.findIndex(s => s.url === url);
+            loadSong(idx, true);
+        }
+
+        function togglePlay(force = false) {
+            initAudioCore();
+            if(audio.paused || force) {
+                audio.play(); playIcon.className = "fas fa-pause";
+                disk.style.animationPlayState = "running";
+                document.getElementById('glowCircle').style.opacity = "0.4";
+            } else {
+                audio.pause(); playIcon.className = "fas fa-play ml-1";
+                disk.style.animationPlayState = "paused";
+                document.getElementById('glowCircle').style.opacity = "0.1";
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tab-all').className = tab === 'all' ? "text-cyan-400 border-b-2 border-cyan-400 pb-2" : "text-slate-500 hover:text-cyan-300 pb-2";
+            document.getElementById('tab-fav').className = tab === 'fav' ? "text-cyan-400 border-b-2 border-cyan-400 pb-2" : "text-slate-500 hover:text-cyan-300 pb-2";
+            renderPlaylist();
+        }
+
+        function toggleFavoriteCurrent() {
+            const id = allSongs[currentIndex].id;
+            favorites.includes(id) ? favorites = favorites.filter(f => f !== id) : favorites.push(id);
+            localStorage.setItem('neural_favs', JSON.stringify(favorites));
+            updateFavBtn(); renderPlaylist();
+        }
+
+        function updateFavBtn() {
+            const isFav = favorites.includes(allSongs[currentIndex].id);
+            document.getElementById('favBtnMain').className = isFav ? "text-xl text-red-500 scale-125 transition-all" : "text-xl text-slate-600 hover:text-red-500 transition-all";
+            document.getElementById('favBtnMain').innerHTML = isFav ? `<i class="fas fa-heart"></i>` : `<i class="far fa-heart"></i>`;
+        }
+
+        function toggleDSP() { document.getElementById('dspPanel').classList.toggle('mobile-hide'); }
+        function next() { currentIndex = (currentIndex + 1) % allSongs.length; loadSong(currentIndex, true); }
+        function prev() { currentIndex = (currentIndex - 1 + allSongs.length) % allSongs.length; loadSong(currentIndex, true); }
+
+        audio.ontimeupdate = () => {
+            const prog = (audio.currentTime / audio.duration) * 100;
+            document.getElementById('progressBar').value = prog || 0;
+            document.getElementById('currentTime').innerText = fmtTime(audio.currentTime);
+            if(audio.duration) document.getElementById('durationTime').innerText = fmtTime(audio.duration);
+        };
+        const fmtTime = (s) => { const m=Math.floor(s/60), sec=Math.floor(s%60); return `${m}:${sec<10?'0'+sec:sec}`; };
+        document.getElementById('progressBar').oninput = (e) => audio.currentTime = (e.target.value / 100) * audio.duration;
+        document.getElementById('volumeSlider').oninput = (e) => { audio.volume = e.target.value / 100; document.getElementById('volVal').innerText = e.target.value + "%"; };
+        document.getElementById('bassSlider').oninput = (e) => { if(filters[5]) filters[5].gain.value = (e.target.value / 100) * 15; document.getElementById('bassVal').innerText = e.target.value + "%"; };
+        document.querySelectorAll('.eq-slider').forEach((s, i) => s.oninput = (e) => { if(filters[i]) filters[i].gain.value = e.target.value; });
+        audio.onended = () => next();
+
+        function resize() { visualizer.width = window.innerWidth; visualizer.height = window.innerHeight; }
+        window.onresize = resize; resize(); fetchMusic();
+    </script>
+</body>
+</html>
